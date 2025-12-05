@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 from . import schemas,models
 # import engine and session(variable) from the db module
 from .database import engine,SessionLocal
+# import passlib to hash passwords
+# from passlib.context import CryptContext
+# import the Hash class from hashing module
+from .hashing import Hash
 
 app = FastAPI()
 
@@ -71,9 +75,14 @@ def show(id, db:Session=Depends(get_db)):
                             detail=f'Blog with the id {id} is not available')
     return blog
 
+# we use argon2 here since bcrypt was cracking
+# pwd_cxt=CryptContext(schemes=["argon2"], deprecated="auto")
+
 @app.post('/user')
 def create_user(request:schemas.User, db:Session=Depends(get_db)):
-    new_user=models.User(name=request.name, email=request.email, password=request.password)
+    # hash the password before storing it
+    hashed_password = Hash.bcrypt(request.password)
+    new_user=models.User(name=request.name, email=request.email, password=hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
