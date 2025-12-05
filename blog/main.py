@@ -1,5 +1,6 @@
 # import depends for dependency injection
-from fastapi import FastAPI, Depends
+# import status for displaying status codes and HTTPException for raising exceptions
+from fastapi import FastAPI, Depends, status, HTTPException
 # import session from orm
 from sqlalchemy.orm import Session
 # import the schemas module
@@ -22,6 +23,7 @@ def get_db():
 
 @app.post('/blog')
 # use schemas.Blog to define the request body
+# db should be instance of Session and use Depends to get the db session    
 def create(request: schemas.Blog, db:Session=Depends(get_db)):
     # add new blog to the database
     new_blog=models.Blog(title=request.title,body=request.body)
@@ -30,6 +32,23 @@ def create(request: schemas.Blog, db:Session=Depends(get_db)):
     # pass instance of new_blog to refresh to get the new data with id
     db.refresh(new_blog)
     return new_blog
+
+@app.get('/blog')
+def all(db:Session=Depends(get_db)):
+    # return all blogs and query on Blog from models
+    blogs=db.query(models.Blog).all()
+    return blogs
+
+# import status and use 201 for created
+@app.get('/blog/{id}', status_code=201)
+def show(id, db:Session=Depends(get_db)):
+    # get the blog with the given id
+    blog=db.query(models.Blog).filter(models.Blog.id==id).first()
+    if not blog:
+        # raise HTTPException if blog not found with status code and detail
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f'Blog with the id {id} is not available')
+    return blog
 
 if __name__ == '__main__':
     import uvicorn
