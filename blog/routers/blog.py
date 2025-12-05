@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from ..repository import blog
 # from requests import Session
-from .. import schemas, models, database
+from .. import schemas, models, database, oauth2
 
 router = APIRouter(
     prefix="/blog",
@@ -11,7 +11,7 @@ router = APIRouter(
 )
 
 @router.get('/',response_model=List[schemas.ShowBlog])
-def all(db:Session=Depends(database.get_db)):
+def all(db:Session=Depends(database.get_db),current_user:schemas.User=Depends(oauth2.get_current_user)):
     # return all blogs and query on Blog from models
     # blogs=db.query(models.Blog).all()
     # return blogs
@@ -20,7 +20,7 @@ def all(db:Session=Depends(database.get_db)):
 @router.post('/',tags=["Blogs"])
 # use schemas.Blog to define the request body
 # db should be instance of Session and use Depends to get the db session    
-def create(request: schemas.Blog, db:Session=Depends(database.get_db)):
+def create(request: schemas.Blog, db:Session=Depends(database.get_db), current_user:schemas.User=Depends(oauth2.get_current_user)):
     # add new blog to the database
     # new_blog=models.Blog(title=request.title,body=request.body,user_id=1)
     # db.add(new_blog)
@@ -31,7 +31,7 @@ def create(request: schemas.Blog, db:Session=Depends(database.get_db)):
     return blog.create(request, db)
 
 @router.delete('/{id}',status_code=status.HTTP_204_NO_CONTENT)
-def destroy(id, db:Session=Depends(database.get_db)):
+def destroy(id, db:Session=Depends(database.get_db), current_user:schemas.User=Depends(oauth2.get_current_user)):
     # blog=db.query(models.Blog).filter(models.Blog.id==id)
     # if not blog.first():
     #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -42,7 +42,7 @@ def destroy(id, db:Session=Depends(database.get_db)):
     return blog.destroy(id, db)
 
 @router.put('/{id}', status_code=status.HTTP_202_ACCEPTED)
-def update(id, request:schemas.Blog, db:Session=Depends(database.get_db)):
+def update(id, request:schemas.Blog, db:Session=Depends(database.get_db), current_user:schemas.User=Depends(oauth2.get_current_user)):
     # blog=db.query(models.Blog).filter(models.Blog.id==id)
     # if not blog.first():
     #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -60,7 +60,7 @@ def update(id, request:schemas.Blog, db:Session=Depends(database.get_db)):
 
 # import status and use 201 for created
 @router.get('/{id}', status_code=201, response_model=schemas.ShowBlog)
-def show(id, db:Session=Depends(database.get_db)):
+def show(id, db:Session=Depends(database.get_db), current_user:schemas.User=Depends(oauth2.get_current_user)):
     # # get the blog with the given id
     # blog=db.query(models.Blog).filter(models.Blog.id==id).first()
     # if not blog:
