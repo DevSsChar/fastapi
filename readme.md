@@ -1092,6 +1092,28 @@ pwd_cxt = CryptContext(schemes=["argon2"], deprecated="auto")
 
 ---
 
+## 📝 Note on Deployment
+
+**Deployment is not covered in this project.** The original course used Deta for deployment, but Deta has been discontinued. 
+
+For deploying your FastAPI application, consider these modern alternatives:
+- **[Render](https://render.com/)** - Free tier available, easy deployment
+- **[Railway](https://railway.app/)** - Simple deployment with free tier
+- **[Fly.io](https://fly.io/)** - Generous free tier for small apps
+- **[Vercel](https://vercel.com/)** - Serverless deployment (requires adapters)
+- **[AWS Lambda](https://aws.amazon.com/lambda/)** - Serverless with Mangum adapter
+- **[DigitalOcean App Platform](https://www.digitalocean.com/products/app-platform)** - Easy container deployment
+- **[Heroku](https://www.heroku.com/)** - Traditional PaaS (paid plans only)
+
+For production deployment, you'll typically need to:
+1. Set up environment variables for secrets (SECRET_KEY, database URL)
+2. Use PostgreSQL instead of SQLite
+3. Configure CORS for frontend access
+4. Set up proper logging
+5. Use production-ready server settings
+
+---
+
 ## 🙏 Credits
 
 ### Original Course
