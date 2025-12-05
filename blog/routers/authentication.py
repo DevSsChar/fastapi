@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from .. import schemas,database,models
 from ..hashing import Hash
 from sqlalchemy.orm import Session
+from datetime import timedelta
+from ..JWTtoken import create_access_token, access_token_expire_minutes
 router = APIRouter(
     tags=["Authentication"],
 )
@@ -16,4 +18,9 @@ def login(request:schemas.Login,db:Session=Depends(database.get_db)):
     if not Hash.verify(user.password,request.password):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND
                              ,detail="Invalid Credentials")
-    return user
+    # access_token_expires = timedelta(minutes=access_token_expire_minutes) optional
+    access_token = create_access_token(
+        data={"sub": user.email}
+        #, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
