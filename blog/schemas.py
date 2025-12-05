@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 # create the pydantic schemas here
@@ -6,7 +6,7 @@ class Blog(BaseModel):
     title: str
     body: str
     class Config:
-        orm_mode=True
+        from_attributes = True
 
 class User(BaseModel):
     name: str
@@ -18,12 +18,11 @@ class ShowUser(BaseModel):
     email: str
     blogs: List[Blog]=[]
     class Config:
-        orm_mode=True
+        from_attributes = True
 
 # to create a response model by extending the Blog schema
 class ShowBlog(Blog):
     # need this Config class to work with ORM models
-    # removed in newer versions of pydantic
-    creator: ShowUser
+    user: Optional[ShowUser] = None  # Changed from creator to user
     class Config:
-        orm_mode=True
+        from_attributes = True
