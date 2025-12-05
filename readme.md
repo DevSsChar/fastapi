@@ -63,10 +63,11 @@ fastapi/
 │   ├── models.py               # SQLAlchemy ORM models
 │   ├── schemas.py              # Pydantic schemas
 │   ├── hashing.py              # Password hashing utilities
-│   ├── JWTtoken.py             # JWT token generation
+│   ├── JWTtoken.py             # JWT token generation & verification
+│   ├── oauth2.py               # OAuth2 scheme & authentication
 │   ├── routers/
 │   │   ├── __init__.py
-│   │   ├── blog.py             # Blog endpoints
+│   │   ├── blog.py             # Blog endpoints (protected)
 │   │   ├── user.py             # User endpoints
 │   │   └── authentication.py  # Login endpoint
 │   └── repository/
@@ -709,17 +710,21 @@ def login(request: schemas.Login, db: Session = Depends(database.get_db)):
 **Commit:** `JWT Auth done`
 
 **What was done:**
-- JWT token generation
-- Complete authentication system
+- JWT token generation and verification
+- Complete authentication system with OAuth2
+- Protected endpoints requiring authentication
 
 **Files:**
-- `JWTtoken.py`
-- Updated `routers/authentication.py`
+- `JWTtoken.py` - Token creation and verification
+- `oauth2.py` - OAuth2 scheme and user authentication
+- Updated `routers/authentication.py` - Login with token generation
+- Updated `routers/blog.py` - Protected blog endpoints
 
 **Code (`JWTtoken.py`):**
 ```python
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
+from blog import schemas
 
 SECRET_KEY = "b4e1a0c9c3e54f71a4f8d8f74c52c1f603f2a5bc8cdd4e61b2f283f54d7e92af"
 algorithm = "HS256"
@@ -731,6 +736,35 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=algorithm)
     return encoded_jwt
+
+def verify_access_token(token: str, credentials_exception):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[algorithm])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+        token_data = schemas.TokenData(email=email)
+        return token_data
+    except JWTError:
+        raise credentials_exception
+```
+
+**Code (`oauth2.py`):**
+```python
+from typing import Annotated
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from . import JWTtoken
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+async def get_current_user(data: Annotated[str, Depends(oauth2_scheme)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"}, 
+    )
+    return JWTtoken.verify_access_token(data, credentials_exception)
 ```
 
 **Code (`routers/authentication.py`):**
@@ -757,6 +791,22 @@ def login(request: schemas.Login, db: Session = Depends(database.get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 ```
 
+**Code (`routers/blog.py` - Protected endpoints):**
+```python
+from .. import oauth2
+
+@router.get('/', response_model=List[schemas.ShowBlog])
+def all(db: Session = Depends(database.get_db), 
+        current_user: schemas.User = Depends(oauth2.get_current_user)):
+    return blog.all(db)
+
+@router.post('/')
+def create(request: schemas.Blog, 
+           db: Session = Depends(database.get_db),
+           current_user: schemas.User = Depends(oauth2.get_current_user)):
+    return blog.create(request, db)
+```
+
 **Code (`schemas.py`):**
 ```python
 class Token(BaseModel):
@@ -770,22 +820,32 @@ class TokenData(BaseModel):
 **Theory:**
 - **JWT (JSON Web Token):** Self-contained token containing user information
 - **Structure:** Header.Payload.Signature
+- **OAuth2PasswordBearer:** FastAPI's OAuth2 implementation with password flow
 - **Benefits:**
   - Stateless authentication
   - No server-side session storage
   - Can be verified without database lookup
+  - Protected endpoints require valid tokens
 - **Security:**
   - Token is signed with SECRET_KEY
-  - Includes expiration time
+  - Includes expiration time (30 minutes)
   - Cannot be tampered with
+  - Tokens must be included in Authorization header
 
 **How it works:**
 1. User logs in with email/password
 2. Server verifies credentials
 3. Server generates JWT with user email
 4. Token returned to client
-5. Client includes token in subsequent requests
-6. Server verifies token to authenticate user
+5. Client includes token in Authorization header: `Bearer <token>`
+6. Protected endpoints verify token via `get_current_user` dependency
+7. Invalid/expired tokens receive 401 Unauthorized
+
+**Protected Endpoints:**
+All blog endpoints now require authentication. Users must:
+1. Login to receive access token
+2. Include token in requests: `Authorization: Bearer <your_token>`
+3. Token is automatically validated before endpoint execution
 
 ---
 
@@ -805,11 +865,11 @@ class TokenData(BaseModel):
 ### Blogs
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| GET | `/blog` | Get all blogs | No |
-| POST | `/blog` | Create new blog | No |
-| GET | `/blog/{id}` | Get blog by ID | No |
-| PUT | `/blog/{id}` | Update blog | No |
-| DELETE | `/blog/{id}` | Delete blog | No |
+| GET | `/blog` | Get all blogs | ✅ Yes |
+| POST | `/blog` | Create new blog | ✅ Yes |
+| GET | `/blog/{id}` | Get blog by ID | ✅ Yes |
+| PUT | `/blog/{id}` | Update blog | ✅ Yes |
+| DELETE | `/blog/{id}` | Delete blog | ✅ Yes |
 
 ---
 
@@ -854,7 +914,7 @@ class TokenData(BaseModel):
 
 ### Example Login Flow
 
-**Request:**
+**1. Login to get token:**
 ```json
 POST /login
 {
@@ -870,6 +930,24 @@ POST /login
     "token_type": "bearer"
 }
 ```
+
+**2. Use token to access protected endpoints:**
+
+**In Swagger UI:**
+1. Click the "Authorize" 🔓 button at the top
+2. Enter your access token in the value field
+3. Click "Authorize"
+4. All subsequent requests will include the token
+
+**With cURL:**
+```bash
+curl -X GET "http://127.0.0.1:8001/blog" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**With Postman/Thunder Client:**
+- Authorization tab → Type: Bearer Token
+- Paste your token in the Token field
 
 ---
 
@@ -925,16 +1003,25 @@ curl -X POST "http://127.0.0.1:8001/login" \
   -d '{"email": "john@example.com", "password": "secret123"}'
 ```
 
-**Create Blog:**
+**Login (Get Token):**
+```bash
+curl -X POST "http://127.0.0.1:8001/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "password": "secret123"}'
+```
+
+**Create Blog (with token):**
 ```bash
 curl -X POST "http://127.0.0.1:8001/blog" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -d '{"title": "My First Blog", "body": "This is the content"}'
 ```
 
-**Get All Blogs:**
+**Get All Blogs (with token):**
 ```bash
-curl -X GET "http://127.0.0.1:8001/blog"
+curl -X GET "http://127.0.0.1:8001/blog" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 ---
@@ -987,6 +1074,13 @@ pwd_cxt = CryptContext(schemes=["argon2"], deprecated="auto")
 ### Issue: Database not updating
 **Solution:** Delete `blog.db` and restart server to recreate tables
 
+### Issue: `401 Unauthorized` when accessing blog endpoints
+**Solution:** All blog endpoints now require authentication. You must:
+1. Create a user account first
+2. Login to get an access token
+3. Include the token in your requests: `Authorization: Bearer <token>`
+4. In Swagger UI, click the "Authorize" button and paste your token
+
 ---
 
 ## 📚 Additional Resources
@@ -1008,6 +1102,9 @@ Special thanks to **Bitfumes** for creating an excellent FastAPI tutorial that f
 ### Enhancements Made
 - ✅ Upgraded to Pydantic v2 (`from_attributes` instead of `orm_mode`)
 - ✅ Switched from bcrypt to Argon2 for better security
+- ✅ Implemented OAuth2 with JWT token verification
+- ✅ Protected all blog endpoints with authentication
+- ✅ Added `oauth2.py` module for authentication middleware
 - ✅ Fixed import issues and module structure
 - ✅ Added comprehensive documentation
 - ✅ Improved error handling
