@@ -26,3 +26,7 @@ class ShowBlog(Blog):
     user: Optional[ShowUser] = None  # Changed from creator to user
     class Config:
         from_attributes = True
+
+class Login(BaseModel):
+    email: str
+    password: str
