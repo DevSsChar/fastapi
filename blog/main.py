@@ -71,6 +71,14 @@ def show(id, db:Session=Depends(get_db)):
                             detail=f'Blog with the id {id} is not available')
     return blog
 
+@app.post('/user')
+def create_user(request:schemas.User, db:Session=Depends(get_db)):
+    new_user=models.User(name=request.name, email=request.email, password=request.password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='127.0.0.1', port=8001)

@@ -11,3 +11,8 @@ class ShowBlog(Blog):
     # removed in newer versions of pydantic
     class Config:
         orm_mode=True
+
+class User(BaseModel):
+    name: str
+    email: str
+    password: str
