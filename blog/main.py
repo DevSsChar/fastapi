@@ -1,3 +1,4 @@
+from typing import List
 # import depends for dependency injection
 # import status for displaying status codes and HTTPException for raising exceptions
 from fastapi import FastAPI, Depends, status, HTTPException
@@ -53,14 +54,14 @@ def update(id, request:schemas.Blog, db:Session=Depends(get_db)):
     db.commit()
     return 'updated'
 
-@app.get('/blog')
+@app.get('/blog',response_model=List[schemas.ShowBlog])
 def all(db:Session=Depends(get_db)):
     # return all blogs and query on Blog from models
     blogs=db.query(models.Blog).all()
     return blogs
 
 # import status and use 201 for created
-@app.get('/blog/{id}', status_code=201)
+@app.get('/blog/{id}', status_code=201, response_model=schemas.ShowBlog)
 def show(id, db:Session=Depends(get_db)):
     # get the blog with the given id
     blog=db.query(models.Blog).filter(models.Blog.id==id).first()
