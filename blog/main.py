@@ -31,7 +31,7 @@ def get_db():
 # db should be instance of Session and use Depends to get the db session    
 def create(request: schemas.Blog, db:Session=Depends(get_db)):
     # add new blog to the database
-    new_blog=models.Blog(title=request.title,body=request.body)
+    new_blog=models.Blog(title=request.title,body=request.body,user_id=1)
     db.add(new_blog)
     db.commit()
     # pass instance of new_blog to refresh to get the new data with id
@@ -78,7 +78,7 @@ def show(id, db:Session=Depends(get_db)):
 # we use argon2 here since bcrypt was cracking
 # pwd_cxt=CryptContext(schemes=["argon2"], deprecated="auto")
 
-@app.post('/user')
+@app.post('/user',response_model=schemas.ShowUser)
 def create_user(request:schemas.User, db:Session=Depends(get_db)):
     # hash the password before storing it
     hashed_password = Hash.bcrypt(request.password)
@@ -87,6 +87,14 @@ def create_user(request:schemas.User, db:Session=Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return new_user
+
+@app.get('/user/{id}', response_model=schemas.ShowUser)
+def get_user(id, db:Session=Depends(get_db)):
+    user=db.query(models.User).filter(models.User.id==id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f'User with the id {id} is not available')
+    return user
 
 if __name__ == '__main__':
     import uvicorn
