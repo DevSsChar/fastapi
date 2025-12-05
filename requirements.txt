@@ -6,3 +6,4 @@ passlib[argon2]
 bcrypt
 # for jwt token generation and verification
 python-jose[cryptography]
+python-multipart
